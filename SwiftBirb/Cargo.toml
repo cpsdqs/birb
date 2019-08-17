@@ -1,0 +1,12 @@
+[package]
+name = "swift-birb"
+version = "0.1.0"
+authors = ["cpsdqs <cpsdqs@gmail.com>"]
+edition = "2018"
+
+[dependencies]
+objc = "0.2"
+objc_id = "0.1"
+
+[build-dependencies]
+bindgen = "0.51"
