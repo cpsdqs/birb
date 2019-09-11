@@ -17,7 +17,6 @@ pub enum EventTypeId {
     Pointer = 1,
     Key = 2,
     Scroll = 3,
-    Resize = 4,
 }
 
 impl EventTypeId {
@@ -31,18 +30,37 @@ pub trait EventType: fmt::Debug + From<Event<Self>> {
     fn type_id() -> EventTypeId;
 }
 
-// TODO: some way of indicating the erasing end
-
+/// Types of pointing devices or mechanisms.
 #[repr(u8)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum PointerDevice {
+    /// Touch input from a finger or something of the sort; is expected to be imprecise.
+    ///
+    /// Tilt will never contain useful data, but pressure may contain data from a 3D Touch
+    /// screen—otherwise it’ll be constant 1.
     Touch = 0,
+
+    /// Pen input.
+    ///
+    /// Tilt should default to (0, 0, 1) if it’s not supported.
     Pen = 1,
+
+    /// Eraser input.
+    ///
+    /// Some erasers don’t actually support pressure at all (e.g. the Surface Pen) so in this case
+    /// it should default to constant 1.
+    /// Tilt should default to (0, 0, 1) if it’s not supported.
     Eraser = 2,
+
+    /// Any indirect input mechanism.
+    ///
+    /// Tilt will never contain useful data, but pressure may contain data from a Force Touch
+    /// trackpad—otherwise it’ll be constant 1.
     Cursor = 3,
 }
 
 impl PointerDevice {
+    /// If true, the input mechanism is precise and can hit small targets.
     pub fn is_precise(&self) -> bool {
         match self {
             PointerDevice::Touch => false,
@@ -50,6 +68,10 @@ impl PointerDevice {
         }
     }
 
+    /// If true, the input mechanism is volatile and can’t be expected to hold perfectly still.
+    ///
+    /// Precise drag-and-drop is a bad experience with these when not accounted for because stuff
+    /// moves a tiny bit e.g. when you lift the pen from the screen.
     pub fn is_volatile(&self) -> bool {
         match self {
             PointerDevice::Touch | PointerDevice::Pen | PointerDevice::Eraser => true,
@@ -61,9 +83,27 @@ impl PointerDevice {
 /// A hover event.
 #[derive(Debug)]
 pub struct Hover {
-    device: PointerDevice,
+    /// Unique ID of the pointer, or zero. If nonzero, can be expected to persist forever.
+    ///
+    /// This value will be computed from e.g. hardware IDs in wacom pens.
+    id: u64,
+
+    /// Event location in the parent coordinate system.
     location: Point2<f64>,
+
+    /// Event location in the window coordinate system.
     window_location: Point2<f64>,
+
+    /// Pointer tilt, expressed as a unit vector. Will point from the tip of the pen to the far end
+    /// of the pen.
+    ///
+    /// The Z axis points outwards from the screen.
+    tilt: Vector3<f64>,
+
+    /// The device type that emitted this hover event.
+    ///
+    /// Touch devices will never emit hover events.
+    device: PointerDevice,
 }
 
 impl EventType for Hover {
@@ -84,6 +124,9 @@ impl From<Event<Hover>> for Hover {
 /// A pointer event.
 #[derive(Debug)]
 pub struct Pointer {
+    /// Unique ID of the pointer, or zero. If nonzero, can be expected to persist forever.
+    ///
+    /// This value will be computed from e.g. hardware IDs in wacom pens.
     id: u64,
 
     /// Event location in the parent coordinate system.
@@ -93,8 +136,6 @@ pub struct Pointer {
     window_location: Point2<f64>,
 
     /// Pointer pressure, between 0 and 1.
-    ///
-    /// Will be 1 if the device does not support pressure.
     pressure: f64,
 
     /// Pointer tilt, expressed as a unit vector. Will point from the tip of the pen to the far end
@@ -103,14 +144,8 @@ pub struct Pointer {
     /// The Z axis points outwards from the screen.
     tilt: Vector3<f64>,
 
-    /// If not None, the present pressure and tilt values should not be trusted and will be updated
-    /// later.
-    /// An index is given to identify the update.
-    estimation_index: Option<usize>,
-
     /// The device type that emitted this pointer event.
     device: PointerDevice,
-    // TODO: event capturing
 }
 
 impl EventType for Pointer {
@@ -151,12 +186,20 @@ impl From<Event<Key>> for Key {
     }
 }
 
+/// Modifier key state.
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
 pub struct KeyModifiers {
+    /// Whether any shift key is pressed.
     shift: bool,
+
+    /// Whether any control key is pressed.
     control: bool,
+
+    /// Whether any option key or alt key is pressed.
     option: bool,
+
+    /// Whether any command key or meta key is pressed.
     command: bool,
 }
 
@@ -171,6 +214,10 @@ pub struct Scroll {
 
     /// Scroll delta in points.
     delta: Vector2<f64>,
+
+    /// If true, the scrolling device is discrete (e.g. a mouse wheel that scrolls in increments)
+    /// and may benefit from smooth scrolling.
+    is_discrete: bool,
 }
 
 impl EventType for Scroll {
@@ -208,6 +255,9 @@ impl<T: EventType> fmt::Debug for EventHandler<T> {
     }
 }
 
+/// Keyboard layout-independent identifiers for keyboard keys.
+///
+/// Some obscure keys may be missing.
 #[repr(u8)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum KeyCode {

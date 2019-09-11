@@ -2,12 +2,17 @@ use crate::color::Color;
 use crate::events::{EventHandler, Hover, Key, Pointer, Scroll};
 use crate::impl_view;
 use crate::rect::Rect;
-use crate::view::{Fragment, NativeType, View, Layout};
+use crate::view::{Fragment, Layout, NativeType, View};
 use cgmath::{Matrix3, SquareMatrix};
-use core::fmt;
+use core::{fmt, mem};
 
-/// A native view that contains graphical content and subviews.
+#[cfg(target_os = "macos")]
+use swift_birb::protocol::SBLayerPatch;
+
+/// A native view that contains graphical content and may have subviews.
 pub struct Layer {
+    pub key: Option<u64>,
+
     /// Layer bounds.
     pub bounds: Rect,
 
@@ -77,6 +82,7 @@ impl fmt::Debug for Layer {
 impl Default for Layer {
     fn default() -> Self {
         Layer {
+            key: None,
             bounds: Rect::zero(),
             background: Color::default(),
             corner_radius: 0.,
@@ -89,6 +95,7 @@ impl Default for Layer {
             hover_action: None,
             key_action: None,
             scroll_action: None,
+            layout: Box::new(()),
         }
     }
 }
@@ -117,5 +124,23 @@ impl_view! {
     }
     fn native_type(&self) -> Option<NativeType> {
         Some(NativeType::Layer)
+    }
+    fn key(&self) -> Option<u64> {
+        self.key
+    }
+}
+
+impl Layer {
+    pub(crate) fn as_patch(&self) -> SBLayerPatch {
+        SBLayerPatch {
+            bounds: self.bounds.into(),
+            background: self.background.into(),
+            corner_radius: self.corner_radius,
+            border_width: self.border.map_or(0., |(w, _)| w),
+            border_color: self.border.map_or(Color::default(), |(_, c)| c).into(),
+            clip_contents: self.clip_contents,
+            transform: unsafe { mem::transmute(self.transform) }, // totally safe, trust me
+            opacity: self.opacity,
+        }
     }
 }

@@ -14,8 +14,11 @@ fn build_cocoa() {
 
     let is_release = env::var("PROFILE") == Ok("release".to_string());
     let proj_path = env::var("CARGO_MANIFEST_DIR").unwrap();
+    let out_dir = env::var("OUT_DIR").unwrap();
 
     let mut xcode_args = Vec::new();
+    xcode_args.push("-scheme");
+    xcode_args.push("SwiftBirb");
     xcode_args.push("-configuration");
     if is_release {
         xcode_args.push("Release");
@@ -25,6 +28,8 @@ fn build_cocoa() {
 
     let output = Command::new("xcodebuild")
         .args(&xcode_args)
+        .arg("-derivedDataPath")
+        .arg(format!("{}/build", out_dir))
         .stderr(Stdio::piped())
         .output()
         .unwrap();
@@ -36,9 +41,18 @@ fn build_cocoa() {
     for entry in
         fs::read_dir(format!("{}/SwiftBirb", proj_path)).expect("Failed to read ./SwiftBirb")
     {
+        if entry
+            .as_ref()
+            .unwrap()
+            .file_name()
+            .to_str()
+            .unwrap()
+            .starts_with(".")
+        {
+            continue;
+        }
         println!(
-            "cargo:rerun-if-changed={}/SwiftBirb/{}",
-            proj_path,
+            "cargo:rerun-if-changed={}",
             entry.unwrap().path().to_str().unwrap()
         );
     }
@@ -48,8 +62,8 @@ fn build_cocoa() {
 
     let lib_out_path = if is_release { "Release" } else { "Debug" };
     println!(
-        "cargo:rustc-link-search={}/build/{}",
-        proj_path, lib_out_path
+        "cargo:rustc-link-search={}/build/Build/Products/{}",
+        out_dir, lib_out_path
     );
     println!("cargo:rustc-link-lib=SwiftBirb");
 

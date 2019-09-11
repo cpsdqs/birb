@@ -1,14 +1,62 @@
+//! UI library.
+//!
+//! # Conceptual overview
+//! Birb is a declarative view-based cross-platform UI framework.
+//!
+//! ## Views
+//! There are two types of views: native views, and regular composite views (as well as some special
+//! view types like Fragments). Native views like layers or text will be visible on-screen and can
+//! be interacted with, while composite views are simply made up of other (simpler) views.
+//!
+//! Views have properties, state, and a body. When a view is created in code, it is not an actual
+//! view but a virtual representation of a view, and should hence be very cheap to create, starting
+//! with constructors: views should not do anything on their own when created other than storing
+//! their properties. When the view is realized, it will be asked to create a state object which
+//! will persist over the lifetime of the view—side effects and other things should be taken care
+//! of here. Finally, the view body is derived from its properties and its state and declares the
+//! view’s subviews.
+//!
+//! ## Events
+//! When events arrive at a window, they will first target a specific view and then bubble up.
+//! For keyboard events, the first target will be the view that has keyboard focus, and for pointer
+//! events, the first target will be the topmost view with a tracking rectangle under the pointer.
+//!
+//! Tracking rectangles are screen regions with a z-index that will occlude all tracking rectangles
+//! below, and define the regions in which their owner views will receive pointer events. Since not
+//! all views need pointer events, not all views have tracking rectangles.
+//!
+//! Events typically happen in multiple phases: pointers are pressed, moved, and released; keys are
+//! pressed, possibly repeated, and released. Hence, this event architecture reflects that:
+//! when an initial event (such as a pointer-down or keypress) arrives at a target view, *all* of
+//! its ancestors will also receive the event. Each view then has an opportunity to indicate that
+//! it wishes to continue receiving this event, along with a priority level.
+//! The views that indicated the highest priority level will then continue receiving events—all
+//! others will be notified that their event stream has been canceled.
+//!
+//! Over the course of an event views may increase their priority to capture events for themselves.
+//! For example, when the user presses down on a list item, both the list item and the list scroll
+//! view may register themselves with the same priority—but as soon as the pointer is moved, the
+//! scroll view will take control to begin scrolling, and the list item can no longer be selected.
+//!
+//! ## Layout
+//! Layout is performed top-down, meaning a superview will perform its layout first, define the
+//! bounds of its subviews, and then the subviews will do the same. A view may output different
+//! bounds than given by its superview: if a subview finds its size unsatisfactory, it should
+//! request a layout frame, so that in the next frame, layout is performed again; this time with the
+//! superview aware of its minimum size.
+
 pub mod color;
 mod context;
 pub mod events;
-mod host;
+// mod host;
 mod layer;
-mod patch;
+// mod patch;
 mod rect;
-mod tree;
+// mod tree;
 #[macro_use]
 mod view;
+mod view_tree;
 
 pub use context::Context;
-pub use host::Host;
+// pub use host::Host;
 pub use view::{State, View};

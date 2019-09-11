@@ -1,10 +1,39 @@
-use crate::tree::ViewTree;
+use crate::context::Context;
 use crate::rect::Rect;
 use cgmath::{Vector2, Zero};
-use crate::context::Context;
 use core::any::Any;
 use core::fmt;
 use std::sync::Arc;
+use uuid::Uuid;
+
+#[cfg(target_os = "macos")]
+use swift_birb::protocol::SBViewId;
+
+/// A unique identifier for a view.
+///
+/// (this is just a UUID)
+#[repr(C)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct ViewId(u32, u16, u16, [u8; 8]);
+
+impl ViewId {
+    pub(crate) fn new() -> ViewId {
+        let uuid = Uuid::new_v4();
+        let (a, b, c, d) = uuid.as_fields();
+        ViewId(a, b, c, *d)
+    }
+}
+
+impl Into<SBViewId> for ViewId {
+    fn into(self) -> SBViewId {
+        SBViewId {
+            a: self.0,
+            b: self.1,
+            c: self.2,
+            d: self.3,
+        }
+    }
+}
 
 // TODO: state might need to be Arc'd so callback closures can use it
 // or i could also use message enums and a send_message function
@@ -18,7 +47,7 @@ use std::sync::Arc;
 /// ```text
 /// impl_view! {
 ///     StructName;
-///     fn new_state(&self) {
+///     fn new_state(&self) { // optional
 ///         ... -> Box<dyn State>
 ///     }
 ///     fn body(&self, state_variable: StateType) {
@@ -32,7 +61,7 @@ macro_rules! impl_view {
     (
         $(#[$attr:meta])*
         $struct:ty;
-        fn new_state(&$ns_self:ident) $new_state:tt
+        $(fn new_state(&$ns_self:ident) $new_state:tt)*
         fn body(&$self:ident, $state_var:ident: &$state_type:ty) $body:tt
         $($extra:tt)*
     ) => {
@@ -42,9 +71,9 @@ macro_rules! impl_view {
                 self
             }
 
-            fn new_state(&$ns_self) -> Box<dyn $crate::State> {
+            $(fn new_state(&$ns_self) -> Box<dyn $crate::State> {
                 $new_state
-            }
+            })*
 
             fn body(&$self, state: &dyn ::core::any::Any) -> ::std::sync::Arc<dyn $crate::View> {
                 if let Some($state_var) = state.downcast_ref::<$state_type>() {
@@ -88,7 +117,11 @@ macro_rules! impl_view {
 /// loop.
 pub trait View: Any + fmt::Debug + Send + Sync {
     /// Creates a new state object for this view.
-    fn new_state(&self) -> Box<dyn State>;
+    ///
+    /// Will create [`()`] by default.
+    fn new_state(&self) -> Box<dyn State> {
+        Box::new(())
+    }
 
     /// Renders the body of this view.
     fn body(&self, state: &dyn Any) -> Arc<dyn View>;
@@ -113,6 +146,15 @@ pub trait View: Any + fmt::Debug + Send + Sync {
     fn native_type(&self) -> Option<NativeType> {
         None
     }
+
+    /// For proxy views; should not be overridden usually.
+    ///
+    /// Will be called if the views have the same TypeId, so the default implementation that always
+    /// returns true should be fine for almost all views.
+    fn is_same_type(&self, other: &dyn View) -> bool {
+        drop(other);
+        true
+    }
 }
 
 /// Types of native views.
@@ -122,6 +164,7 @@ pub enum NativeType {
     Text,
     TextField,
     VkSurface,
+    VisualEffectView,
 }
 
 /// View state associated with a view.
@@ -139,9 +182,6 @@ pub trait State: Any + fmt::Debug {
     /// Called after the associated view has appeared and been rendered.
     fn did_appear(&self) {}
 
-    /// Called before the associated view disappears.
-    fn will_disappear(&self) {}
-
     /// Called before the component is updated from a new virtual view.
     fn will_update(&self, update: &dyn View) {
         drop(update);
@@ -151,11 +191,8 @@ pub trait State: Any + fmt::Debug {
 impl_view! {
     /// An empty view type that does absolutely nothing.
     ();
-    fn new_state(&self) {
-        Box::new(())
-    }
     fn body(&self, _state: &()) {
-        panic!("()::body should not be called; it must be handled as a special case")
+        Arc::new(())
     }
 }
 
@@ -173,11 +210,8 @@ impl View for Fragment {
     fn as_any(&self) -> &dyn Any {
         self
     }
-    fn new_state(&self) -> Box<dyn State> {
-        Box::new(())
-    }
     fn body(&self, _: &dyn Any) -> Arc<dyn View> {
-        panic!("Fragment::body should not be called; it must be handled as a special case")
+        Arc::new(self.clone())
     }
     fn eq(&self, other: &dyn View) -> bool {
         if let Some(other) = other.as_any().downcast_ref::<Self>() {
@@ -214,7 +248,8 @@ pub trait Layout: Any + fmt::Debug + Send + Sync {
 }
 
 pub struct LayoutContext<'a> {
-    tree: &'a mut ViewTree,
+    // tree: &'a mut ViewTree,
+    tree: &'a mut (),
 }
 
 impl<'a> LayoutContext<'a> {
@@ -234,6 +269,9 @@ impl<'a> SubviewLayout<'a> {
         unimplemented!()
     }
 
+    /// The subview’s minimum size.
+    /// May be zero if it hasn’t been computed yet (e.g. on first render).
+    /// If it’s important, use `force_layout` to try and get it a frame earlier.
     pub fn min_size(&self) -> Vector2<f64> {
         unimplemented!()
     }

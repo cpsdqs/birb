@@ -2,24 +2,10 @@ use crate::context::Context;
 use crate::events::{EventHandler, EventType, EventTypeId, Hover, Key, Pointer, Scroll};
 use crate::layer::Layer;
 use crate::patch::{LayerPatch, Patch};
-use crate::view::{Fragment, State, View};
+use crate::view::{Fragment, State, View, ViewId};
 use std::collections::BTreeMap;
 use std::collections::HashMap;
 use std::sync::Arc;
-use uuid::Uuid;
-
-/// A unique identifier for a tree node.
-#[repr(C)]
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct ViewId(u32, u16, u16, [u8; 8]);
-
-impl ViewId {
-    fn new() -> ViewId {
-        let uuid = Uuid::new_v4();
-        let (a, b, c, d) = uuid.as_fields();
-        ViewId(a, b, c, *d)
-    }
-}
 
 /// A tree of views.
 #[derive(Debug)]

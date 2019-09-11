@@ -49,11 +49,6 @@ class SBLayer : NSView, SBRenderable {
 
     // MARK: SBRenderable
 
-    var hoverAction: SBHandlerId?
-    var pointerAction: SBHandlerId?
-    var keyAction: SBHandlerId?
-    var scrollAction: SBHandlerId?
-
     func id() -> ViewId {
         node.id
     }
@@ -74,11 +69,6 @@ class SBLayer : NSView, SBRenderable {
         layer.masksToBounds = data.clip_contents
         layer.transform = data.transform.caTransform3D
         layer.opacity = Float(data.opacity)
-
-        hoverAction = data.hover_action
-        pointerAction = data.pointer_action
-        keyAction = data.key_action
-        scrollAction = data.scroll_action
     }
 
     func addSubview(_ subview: SBNode) {

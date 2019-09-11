@@ -410,10 +410,6 @@ typedef struct {
     bool clip_contents;
     SBMatrix3 transform;
     float64_t opacity;
-    SBHandlerId hover_action;
-    SBHandlerId pointer_action;
-    SBHandlerId key_action;
-    SBHandlerId scroll_action;
 } SBLayerPatch;
 
 /** Types of nodes. */

@@ -2,6 +2,7 @@
 
 use cgmath::{EuclideanSpace, Point2, Vector2, Zero};
 use std::{f64, ops};
+use swift_birb::protocol::{SBRect, SBVector2};
 
 /// A rectangle.
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -99,6 +100,21 @@ impl ops::Add<Point2<f64>> for Rect {
         Rect {
             origin: self.origin + point.to_vec(),
             size: self.size,
+        }
+    }
+}
+
+impl Into<SBRect> for Rect {
+    fn into(self) -> SBRect {
+        SBRect {
+            origin: SBVector2 {
+                x: self.origin.x,
+                y: self.origin.y,
+            },
+            size: SBVector2 {
+                x: self.size.x,
+                y: self.size.y,
+            },
         }
     }
 }
