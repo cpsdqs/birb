@@ -57,9 +57,6 @@ fn build_cocoa() {
         );
     }
 
-    // libswift libraries
-    println!("cargo:rustc-link-search=/usr/lib/swift");
-
     let lib_out_path = if is_release { "Release" } else { "Debug" };
     println!(
         "cargo:rustc-link-search={}/build/Build/Products/{}",

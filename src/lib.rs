@@ -19,11 +19,14 @@
 //! ## Events
 //! When events arrive at a window, they will first target a specific view and then bubble up.
 //! For keyboard events, the first target will be the view that has keyboard focus, and for pointer
-//! events, the first target will be the topmost view with a tracking rectangle under the pointer.
+//! events, the first target will be the topmost view with a pointer tracking rectangle under the
+//! pointer.
 //!
-//! Tracking rectangles are screen regions with a z-index that will occlude all tracking rectangles
-//! below, and define the regions in which their owner views will receive pointer events. Since not
-//! all views need pointer events, not all views have tracking rectangles.
+//! Pointer tracking rectangles are screen regions with a z-index that will occlude all tracking
+//! rectangles below, and define the regions in which their owner views will receive pointer events.
+//! Since not all views need pointer events, not all views have tracking rectangles.
+//! Also note that views that clip their contents may clip all contained tracking rectangles to
+//! their tracking rectangle as well.
 //!
 //! Events typically happen in multiple phases: pointers are pressed, moved, and released; keys are
 //! pressed, possibly repeated, and released. Hence, this event architecture reflects that:
@@ -44,13 +47,18 @@
 //! bounds than given by its superview: if a subview finds its size unsatisfactory, it should
 //! request a layout frame, so that in the next frame, layout is performed again; this time with the
 //! superview aware of its minimum size.
+//!
+//! ## Coordinate System
+//! As the host is usually a window, this will be in terms of windows: the origin of the top-level
+//! coordinate system is at the top left corner of the window’s content area. The y-axis is oriented
+//! such that positive y points down. The z-axis points outwards from the screen.
 
 pub mod color;
 mod context;
 pub mod events;
 // mod host;
 mod layer;
-// mod patch;
+mod nv_tree;
 mod rect;
 // mod tree;
 #[macro_use]
@@ -58,5 +66,6 @@ mod view;
 mod view_tree;
 
 pub use context::Context;
-// pub use host::Host;
+pub use nv_tree::NVTree;
 pub use view::{State, View};
+pub use view_tree::ViewTree;

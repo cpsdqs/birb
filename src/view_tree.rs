@@ -1,5 +1,7 @@
+use crate::nv_tree::{NativeView, Patch};
 use crate::view::{Fragment, State, View, ViewId};
 use std::collections::HashMap;
+use std::collections::VecDeque;
 use std::sync::Arc;
 
 struct Subregion {
@@ -30,10 +32,46 @@ struct TreeNode {
 /// A view tree; contains a hierarchy of virtual views and manages rendering and updating.
 pub struct ViewTree {
     nodes: HashMap<ViewId, TreeNode>,
-    root: ViewId,
+    root: Option<ViewId>,
+    patches: VecDeque<Patch>,
 }
 
 impl ViewTree {
+    pub fn new() -> ViewTree {
+        ViewTree {
+            nodes: HashMap::new(),
+            root: None,
+            patches: VecDeque::new(),
+        }
+    }
+
+    /// Returns an iterator over available patches.
+    ///
+    /// Does not drain the queue immediately.
+    /// Calling `next` will always remove a patch from the queue.
+    pub fn patches(&mut self) -> impl Iterator<Item = Patch> + '_ {
+        struct PatchIterator<'a>(&'a mut ViewTree);
+        impl<'a> Iterator for PatchIterator<'a> {
+            type Item = Patch;
+            fn next(&mut self) -> Option<Patch> {
+                self.0.patches.pop_front()
+            }
+        }
+
+        PatchIterator(self)
+    }
+
+    /// Renders a root view.
+    pub fn render_root(&mut self, view: Arc<dyn View>) {
+        if let Some(root) = self.root {
+            self.diff(root, &view, 0);
+        } else {
+            let root_id = ViewId::new();
+            self.root = Some(root_id);
+            self.diff(root_id, &view, 0);
+        }
+    }
+
     /// Diffs a view with its current state in the tree.
     ///
     /// - `id`: the view id, for identifying the tree node
@@ -94,7 +132,7 @@ impl ViewTree {
         let state = view.new_state();
 
         if is_native {
-            // TODO: emit patch
+            self.patches.push_back(Patch::Update(id, NativeView::Layer));
         }
 
         self.nodes.insert(
@@ -117,10 +155,13 @@ impl ViewTree {
     /// Removes a view and its subviews.
     ///
     /// Does *not* remove the view from the superview’s `subviews` list. The view must exist.
-    fn remove_view(&mut self, id: ViewId) {
+    fn remove_view(&mut self, id: ViewId, emit_patch: bool) {
         let node = self.nodes.remove(&id).expect("removing nonexistent view");
+        if emit_patch && node.is_native {
+            self.patches.push_back(Patch::Remove(id));
+        }
         for subview in node.subviews {
-            self.remove_view(subview);
+            self.remove_view(subview, true);
         }
     }
 
@@ -131,13 +172,25 @@ impl ViewTree {
         let current = self.nodes.get(&id).expect("replacing nonexistent view");
         let superview = current.superview;
         let nv_ancestor = current.nv_ancestor;
+        let was_native = current.is_native;
+        let is_native = view.native_type().is_some();
 
-        self.remove_view(id);
+        self.remove_view(id, false);
         self.add_view(id, view, nv_subregion_start);
 
         let node = self.nodes.get_mut(&id).unwrap();
+        node.is_native = is_native;
         node.superview = superview;
         node.nv_ancestor = nv_ancestor;
+
+        if was_native && is_native {
+            self.patches
+                .push_back(Patch::Replace(id, NativeView::Layer));
+        } else if was_native {
+            self.patches.push_back(Patch::Remove(id));
+        } else if is_native {
+            self.patches.push_back(Patch::Update(id, NativeView::Layer));
+        }
     }
 
     /// Updates an existing view with new properties, which must be of the same type.
@@ -148,6 +201,9 @@ impl ViewTree {
             "update_view called with incorrect type"
         );
         node.state.will_update(&**view);
+        if node.is_native {
+            self.patches.push_back(Patch::Update(id, NativeView::Layer));
+        }
         node.view = Arc::clone(view);
     }
 
@@ -215,8 +271,6 @@ impl ViewTree {
         let mut nv_subviews = Vec::new();
         let mut nv_subregion_cursor = nv_subregion_start;
 
-        // TODO: emit patches
-
         for view in subviews.iter().map(|view| Arc::clone(view)) {
             let key = view.key().map(Key::Key).unwrap_or_else(|| {
                 let k = auto_key_counter;
@@ -247,11 +301,12 @@ impl ViewTree {
 
         // unused subviews need to be removed
         for (_, id) in current_subviews_by_id {
-            self.remove_view(id);
+            self.remove_view(id, true);
         }
 
         self.nodes.get_mut(&superview).unwrap().subviews = new_subviews;
-
+        self.patches
+            .push_back(Patch::Subviews(superview, nv_subviews.clone()));
         nv_subviews
     }
 }

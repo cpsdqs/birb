@@ -170,9 +170,9 @@ pub enum NativeType {
 /// View state associated with a view.
 ///
 /// Will be dropped right after the view disappears.
-pub trait State: Any + fmt::Debug {
+pub trait State: Any + fmt::Debug + Send {
     /// For downcasting.
-    fn as_any(&self) -> &Any;
+    fn as_any(&self) -> &dyn Any;
 
     /// Called before the associated view will appear.
     fn will_appear(&self, context: &Context) {
@@ -198,7 +198,7 @@ impl_view! {
 
 /// For stateless views.
 impl State for () {
-    fn as_any(&self) -> &Any {
+    fn as_any(&self) -> &dyn Any {
         self
     }
 }
@@ -243,6 +243,8 @@ pub trait Layout: Any + fmt::Debug + Send + Sync {
             bounds,
             subview_bounds: context.subviews().map(|_| bounds).collect(),
             min_size: Vector2::zero(),
+            track_pointer: false,
+            clip_pointer: false,
         }
     }
 }
@@ -278,9 +280,20 @@ impl<'a> SubviewLayout<'a> {
 }
 
 pub struct LayoutResult {
+    /// Own view bounds.
     bounds: Rect,
+
+    /// Bounds for all subviews, in order.
     subview_bounds: Vec<Rect>,
+
+    /// Minimum size of this view.
     min_size: Vector2<f64>,
+
+    /// If true, will consider the layout bounds a pointer tracking rectangle.
+    track_pointer: bool,
+
+    /// If true, will clip all pointer tracking rectangles of child views to this view.
+    clip_pointer: bool,
 }
 
 /// Identity layout.
