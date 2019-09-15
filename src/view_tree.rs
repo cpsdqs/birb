@@ -37,6 +37,31 @@ pub struct ViewTree<Ctx> {
     patches: VecDeque<Patch>,
 }
 
+/// A view’s context.
+#[derive(Debug)]
+pub struct Context<Ctx> {
+    // TODO
+    context: Ctx,
+}
+
+impl<Ctx> Context<Ctx> {
+    pub fn request_render(&self) {
+        unimplemented!()
+    }
+
+    pub fn request_layout(&self) {
+        unimplemented!()
+    }
+
+    pub fn request_context(&self) {
+        unimplemented!()
+    }
+
+    pub fn ctx(&self) -> &Ctx {
+        unimplemented!()
+    }
+}
+
 impl<Ctx: 'static> ViewTree<Ctx>
 where
     Ctx: Clone + Send,
@@ -145,7 +170,10 @@ where
         context: Ctx,
     ) {
         let is_native = view.native_type().is_some();
-        let state = view.new_state();
+        let state = view.new_state(Context {
+            // TODO: proper context
+            context: context.clone(),
+        });
 
         if is_native {
             self.patches.push_back(Patch::Update(id, NativeView::Layer));

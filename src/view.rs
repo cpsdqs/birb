@@ -1,5 +1,5 @@
-use crate::context::Context;
 use crate::rect::Rect;
+use crate::view_tree::Context;
 use cgmath::{Vector2, Zero};
 use core::any::Any;
 use core::fmt;
@@ -61,14 +61,14 @@ macro_rules! impl_view {
     (
         $(#[$attr:meta])*
         $struct:ty;
-        $(fn new_state(&$ns_self:ident) $new_state:tt)*
+        $(fn new_state(&$ns_self:ident, $ns_ctx:ident) $new_state:tt)*
         fn body(&$self:ident, $state_var:ident: &$state_type:ty) $body:tt
         $($extra:tt)*
     ) => {
         $(#[$attr])*
         impl<Ctx: 'static> $crate::View<Ctx> for $struct {
             $crate::impl_view!(__internal1);
-            $($crate::impl_view!(__internal2, Ctx, $ns_self, $new_state);)*
+            $($crate::impl_view!(__internal2, Ctx, $ns_self, $ns_ctx, $new_state);)*
             $crate::impl_view!(__internal3, Ctx, $self, $state_var, $state_type, $body, $struct);
             $crate::impl_view!(__internal4, Ctx, $struct);
             $($extra)*
@@ -77,14 +77,14 @@ macro_rules! impl_view {
     (
         $(#[$attr:meta])*
         $struct:ty : $ctx:ty;
-        $(fn new_state(&$ns_self:ident) $new_state:tt)*
+        $(fn new_state(&$ns_self:ident, $ns_ctx:ident) $new_state:tt)*
         fn body(&$self:ident, $state_var:ident: &$state_type:ty) $body:tt
         $($extra:tt)*
     ) => {
         $(#[$attr])*
         impl $crate::View<$ctx> for $struct {
             $crate::impl_view!(__internal1);
-            $($crate::impl_view!(__internal2, $ctx, $ns_self, $new_state);)*
+            $($crate::impl_view!(__internal2, $ctx, $ns_self, $ns_ctx, $new_state);)*
             $crate::impl_view!(__internal3, $ctx, $self, $state_var, $state_type, $struct);
             $crate::impl_view!(__internal4, $ctx, $struct);
             $($extra)*
@@ -95,8 +95,11 @@ macro_rules! impl_view {
             self
         }
     };
-    (__internal2, $ctx:ty, $ns_self:ident, $new_state:tt) => {
-        fn new_state(&$ns_self) -> Box<dyn $crate::State<$ctx>> {
+    (__internal2, $ctx:ty, $ns_self:ident, $ns_ctx:ident, $new_state:tt) => {
+        fn new_state(
+            &$ns_self,
+            $ns_ctx:ident: $crate::Context<$ctx>,
+        ) -> Box<dyn $crate::State<$ctx>> {
             $new_state
         }
     };
@@ -143,7 +146,8 @@ pub trait View<Ctx>: Any + fmt::Debug + Send + Sync {
     /// Creates a new state object for this view.
     ///
     /// Will create [`()`] by default.
-    fn new_state(&self) -> Box<dyn State<Ctx>> {
+    fn new_state(&self, context: Context<Ctx>) -> Box<dyn State<Ctx>> {
+        drop(context);
         Box::new(())
     }
 
@@ -165,6 +169,8 @@ pub trait View<Ctx>: Any + fmt::Debug + Send + Sync {
 
     /// Returns a subview context.
     fn subview_context(&self, state: &dyn Any, context: &Ctx) -> Option<Ctx> {
+        drop(state);
+        drop(context);
         None
     }
 
@@ -192,7 +198,7 @@ pub enum NativeType {
     Layer,
     Text,
     TextField,
-    VkSurface,
+    Surface,
     VisualEffectView,
 }
 
@@ -202,14 +208,6 @@ pub enum NativeType {
 pub trait State<Ctx>: Any + fmt::Debug + Send {
     /// For downcasting.
     fn as_any(&self) -> &dyn Any;
-
-    /// Called before the associated view will appear.
-    fn will_appear(&self, context: &Context) {
-        drop(context);
-    }
-
-    /// Called after the associated view has appeared and been rendered.
-    fn did_appear(&self) {}
 
     /// Called before the component is updated from a new virtual view.
     fn will_update(&self, update: &dyn View<Ctx>) {

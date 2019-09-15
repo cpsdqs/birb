@@ -48,24 +48,43 @@
 //! request a layout frame, so that in the next frame, layout is performed again; this time with the
 //! superview aware of its minimum size.
 //!
+//! ## Contexts
+//! Contexts are used to propagate lateral parameters (e.g. a UI theme) down the view tree without
+//! having to copy it into the view props every single time. They should be cheap to create and
+//! clone (possibly making use of Arcs). Views may choose to modify the context to be different
+//! for their subviews, too.
+//!
 //! ## Coordinate System
 //! As the host is usually a window, this will be in terms of windows: the origin of the top-level
 //! coordinate system is at the top left corner of the window’s content area. The y-axis is oriented
 //! such that positive y points down. The z-axis points outwards from the screen.
+//!
+//! ## NVTree and Backends
+//! To get the views in a ViewTree to show up on screen, an NVTree (native-view tree) and a backend
+//! is required. The NVTree is like the ViewTree—except it only contains native views—and is the
+//! structure where events and layout are handled. It’s also responsible for keeping the backend
+//! in sync with the view tree.
+//!
+//! Backends are platform-specific UI frameworks like Cocoa; abstracted to a common interface. Some
+//! backends may provide more features than others.
+//!
+//! All backends are guaranteed to support:
+//!
+//! - Layers
+//! - Text
+//! - Surfaces
+//! - at least one type of pointer events
 
 pub mod color;
-mod context;
 pub mod events;
 // mod host;
 mod layer;
 mod nv_tree;
 mod rect;
-// mod tree;
 #[macro_use]
 mod view;
 mod view_tree;
 
-pub use context::Context;
-pub use nv_tree::NVTree;
+pub use nv_tree::{NVTree, NativeView, Patch};
 pub use view::{State, View};
-pub use view_tree::ViewTree;
+pub use view_tree::{Context, ViewTree};

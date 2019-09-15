@@ -116,9 +116,6 @@ impl<Ctx: 'static> PartialEq for Layer<Ctx> {
 
 impl_view! {
     Layer<Ctx>;
-    fn new_state(&self) {
-        Box::new(())
-    }
     fn body(&self, _state: &()) {
         std::sync::Arc::new(self.subviews.clone())
     }
