@@ -46,7 +46,7 @@ impl Into<SBViewId> for ViewId {
 ///
 /// ```text
 /// impl_view! {
-///     StructName;
+///     StructName; // or StructName : ContextType
 ///     fn new_state(&self) { // optional
 ///         ... -> Box<dyn State>
 ///     }
@@ -66,38 +66,62 @@ macro_rules! impl_view {
         $($extra:tt)*
     ) => {
         $(#[$attr])*
-        impl $crate::View for $struct {
-            fn as_any(&self) -> &dyn ::core::any::Any {
-                self
-            }
-
-            $(fn new_state(&$ns_self) -> Box<dyn $crate::State> {
-                $new_state
-            })*
-
-            fn body(&$self, state: &dyn ::core::any::Any) -> ::std::sync::Arc<dyn $crate::View> {
-                if let Some($state_var) = state.downcast_ref::<$state_type>() {
-                    fn _dont_complain_about_unused<T>(_: T) {}
-                    _dont_complain_about_unused($state_var);
-                    $body
-                } else {
-                    panic!(
-                        "View::body: invalid state for {}; expected type {}",
-                        stringify!($struct),
-                        stringify!($state_type)
-                    );
-                }
-            }
-
-            fn eq(&self, other: &dyn $crate::View) -> bool {
-                if let Some(other) = other.as_any().downcast_ref::<$struct>() {
-                    self == other
-                } else {
-                    false
-                }
-            }
-
+        impl<Ctx: 'static> $crate::View<Ctx> for $struct {
+            $crate::impl_view!(__internal1);
+            $($crate::impl_view!(__internal2, Ctx, $ns_self, $new_state);)*
+            $crate::impl_view!(__internal3, Ctx, $self, $state_var, $state_type, $body, $struct);
+            $crate::impl_view!(__internal4, Ctx, $struct);
             $($extra)*
+        }
+    };
+    (
+        $(#[$attr:meta])*
+        $struct:ty : $ctx:ty;
+        $(fn new_state(&$ns_self:ident) $new_state:tt)*
+        fn body(&$self:ident, $state_var:ident: &$state_type:ty) $body:tt
+        $($extra:tt)*
+    ) => {
+        $(#[$attr])*
+        impl $crate::View<$ctx> for $struct {
+            $crate::impl_view!(__internal1);
+            $($crate::impl_view!(__internal2, $ctx, $ns_self, $new_state);)*
+            $crate::impl_view!(__internal3, $ctx, $self, $state_var, $state_type, $struct);
+            $crate::impl_view!(__internal4, $ctx, $struct);
+            $($extra)*
+        }
+    };
+    (__internal1) => {
+        fn as_any(&self) -> &dyn ::core::any::Any {
+            self
+        }
+    };
+    (__internal2, $ctx:ty, $ns_self:ident, $new_state:tt) => {
+        fn new_state(&$ns_self) -> Box<dyn $crate::State<$ctx>> {
+            $new_state
+        }
+    };
+    (__internal3, $ctx:ty, $self:ident, $state_var:ident, $state_type:ty, $body:tt, $struct:ty) => {
+        fn body(&$self, state: &dyn ::core::any::Any) -> ::std::sync::Arc<dyn $crate::View<$ctx>> {
+            if let Some($state_var) = state.downcast_ref::<$state_type>() {
+                fn _dont_complain_about_unused<T>(_: T) {}
+                _dont_complain_about_unused($state_var);
+                $body
+            } else {
+                panic!(
+                    "View::body: invalid state for {}; expected type {}",
+                    stringify!($struct),
+                    stringify!($state_type)
+                );
+            }
+        }
+    };
+    (__internal4, $ctx:ty, $struct:ty) => {
+        fn eq(&self, other: &dyn $crate::View<$ctx>) -> bool {
+            if let Some(other) = other.as_any().downcast_ref::<$struct>() {
+                self == other
+            } else {
+                false
+            }
         }
     };
 }
@@ -115,19 +139,19 @@ macro_rules! impl_view {
 /// `body` should always return a native view, eventually. Notably, care should be taken when
 /// returning non-native views such that it doesn’t cause a cycle and end up causing an infinite
 /// loop.
-pub trait View: Any + fmt::Debug + Send + Sync {
+pub trait View<Ctx>: Any + fmt::Debug + Send + Sync {
     /// Creates a new state object for this view.
     ///
     /// Will create [`()`] by default.
-    fn new_state(&self) -> Box<dyn State> {
+    fn new_state(&self) -> Box<dyn State<Ctx>> {
         Box::new(())
     }
 
     /// Renders the body of this view.
-    fn body(&self, state: &dyn Any) -> Arc<dyn View>;
+    fn body(&self, state: &dyn Any) -> Arc<dyn View<Ctx>>;
 
     /// Compares this view to another; used for diffing.
-    fn eq(&self, other: &dyn View) -> bool;
+    fn eq(&self, other: &dyn View<Ctx>) -> bool;
 
     /// For downcasting.
     fn as_any(&self) -> &dyn Any;
@@ -136,6 +160,11 @@ pub trait View: Any + fmt::Debug + Send + Sync {
     ///
     /// Should be derived from a `key` property.
     fn key(&self) -> Option<u64> {
+        None
+    }
+
+    /// Returns a subview context.
+    fn subview_context(&self, state: &dyn Any, context: &Ctx) -> Option<Ctx> {
         None
     }
 
@@ -151,7 +180,7 @@ pub trait View: Any + fmt::Debug + Send + Sync {
     ///
     /// Will be called if the views have the same TypeId, so the default implementation that always
     /// returns true should be fine for almost all views.
-    fn is_same_type(&self, other: &dyn View) -> bool {
+    fn is_same_type(&self, other: &dyn View<Ctx>) -> bool {
         drop(other);
         true
     }
@@ -170,7 +199,7 @@ pub enum NativeType {
 /// View state associated with a view.
 ///
 /// Will be dropped right after the view disappears.
-pub trait State: Any + fmt::Debug + Send {
+pub trait State<Ctx>: Any + fmt::Debug + Send {
     /// For downcasting.
     fn as_any(&self) -> &dyn Any;
 
@@ -183,7 +212,7 @@ pub trait State: Any + fmt::Debug + Send {
     fn did_appear(&self) {}
 
     /// Called before the component is updated from a new virtual view.
-    fn will_update(&self, update: &dyn View) {
+    fn will_update(&self, update: &dyn View<Ctx>) {
         drop(update);
     }
 }
@@ -197,23 +226,23 @@ impl_view! {
 }
 
 /// For stateless views.
-impl State for () {
+impl<Ctx> State<Ctx> for () {
     fn as_any(&self) -> &dyn Any {
         self
     }
 }
 
-pub type Fragment = Vec<Arc<dyn View>>;
+pub type Fragment<Ctx> = Vec<Arc<dyn View<Ctx>>>;
 
 /// A fragment view that expands into its children.
-impl View for Fragment {
+impl<Ctx: 'static> View<Ctx> for Fragment<Ctx> {
     fn as_any(&self) -> &dyn Any {
         self
     }
-    fn body(&self, _: &dyn Any) -> Arc<dyn View> {
+    fn body(&self, _: &dyn Any) -> Arc<dyn View<Ctx>> {
         Arc::new(self.clone())
     }
-    fn eq(&self, other: &dyn View) -> bool {
+    fn eq(&self, other: &dyn View<Ctx>) -> bool {
         if let Some(other) = other.as_any().downcast_ref::<Self>() {
             if self.len() != other.len() {
                 return false;
@@ -236,9 +265,7 @@ pub trait Layout: Any + fmt::Debug + Send + Sync {
     ///
     /// - `bounds`: the (strongly) suggested bounds from the superview.
     /// - `context`: the layout context. Used to access subview layout.
-    fn layout(&self, state: &dyn State, bounds: Rect, mut context: LayoutContext) -> LayoutResult {
-        let _ = state;
-
+    fn layout(&self, bounds: Rect, mut context: LayoutContext) -> LayoutResult {
         LayoutResult {
             bounds,
             subview_bounds: context.subviews().map(|_| bounds).collect(),

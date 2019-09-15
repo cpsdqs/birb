@@ -16,6 +16,10 @@ pub enum Patch {
     Replace(ViewId, NativeView),
     /// Sets a view’s subviews.
     Subviews(ViewId, Vec<ViewId>),
+    /// Replaces a region of a view’s subviews.
+    ///
+    /// `(superview, region, subviews)`
+    SubviewRegion(ViewId, usize, usize, Vec<ViewId>),
     /// Removes a view.
     /// **Does not remove the view from the superview’s subview references.**
     Remove(ViewId),
@@ -54,6 +58,7 @@ impl NVTree {
             Patch::Update(id, view) => self.update_view(id, view),
             Patch::Replace(id, view) => self.replace_view(id, view),
             Patch::Subviews(id, subviews) => self.set_subviews(id, subviews),
+            Patch::SubviewRegion(id, a, b, subviews) => self.subview_region(id, a, b, subviews),
             Patch::Remove(id) => self.remove_view(id),
         }
     }
@@ -107,6 +112,44 @@ impl NVTree {
             None => return Err(PatchError::NoSuchView(id)),
         };
         node.subviews = subviews;
+        Ok(())
+    }
+
+    fn subview_region(
+        &mut self,
+        id: ViewId,
+        offset: usize,
+        len: usize,
+        subviews: Vec<ViewId>,
+    ) -> Result<(), PatchError> {
+        for subview in &subviews {
+            let node = match self.nodes.get_mut(subview) {
+                Some(node) => node,
+                None => return Err(PatchError::NoSuchView(*subview)),
+            };
+            node.superview = Some(id);
+        }
+
+        let node = match self.nodes.get_mut(&id) {
+            Some(node) => node,
+            None => return Err(PatchError::NoSuchView(id)),
+        };
+        // node.subviews[offset..len] = subviews[..len]
+        for (i, j) in (offset..len).zip(0..subviews.len()) {
+            node.subviews[i] = subviews[j];
+        }
+        if subviews.len() < len {
+            // node.subviews[offset + subviews.len()..len] = []
+            for _ in subviews.len()..len {
+                node.subviews.remove(offset + subviews.len());
+            }
+        }
+        if subviews.len() > len {
+            // node.subviews[offset + len] <- subviews[len..]
+            for i in len..subviews.len() {
+                node.subviews.insert(offset + subviews.len(), subviews[i]);
+            }
+        }
         Ok(())
     }
 }

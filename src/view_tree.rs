@@ -4,15 +4,16 @@ use std::collections::HashMap;
 use std::collections::VecDeque;
 use std::sync::Arc;
 
+#[derive(Clone, Copy)]
 struct Subregion {
     pos: usize,
     len: usize,
 }
 
 /// A node in the view tree.
-struct TreeNode {
+struct TreeNode<Ctx> {
     /// The current view object.
-    view: Arc<dyn View>,
+    view: Arc<dyn View<Ctx>>,
     /// If true, this view is a native view.
     is_native: bool,
     /// The immediate superview.
@@ -22,22 +23,25 @@ struct TreeNode {
     /// Subregion in the native ancestor’s subviews.
     nv_subregion: Subregion,
     /// The view state.
-    state: Box<dyn State>,
+    state: Box<dyn State<Ctx>>,
     /// An ordered list of all subviews.
     subviews: Vec<ViewId>,
+    /// The node’s inherited context.
+    context: Ctx,
 }
 
-// TODO: context
-
 /// A view tree; contains a hierarchy of virtual views and manages rendering and updating.
-pub struct ViewTree {
-    nodes: HashMap<ViewId, TreeNode>,
+pub struct ViewTree<Ctx> {
+    nodes: HashMap<ViewId, TreeNode<Ctx>>,
     root: Option<ViewId>,
     patches: VecDeque<Patch>,
 }
 
-impl ViewTree {
-    pub fn new() -> ViewTree {
+impl<Ctx: 'static> ViewTree<Ctx>
+where
+    Ctx: Clone + Send,
+{
+    pub fn new() -> ViewTree<Ctx> {
         ViewTree {
             nodes: HashMap::new(),
             root: None,
@@ -50,8 +54,8 @@ impl ViewTree {
     /// Does not drain the queue immediately.
     /// Calling `next` will always remove a patch from the queue.
     pub fn patches(&mut self) -> impl Iterator<Item = Patch> + '_ {
-        struct PatchIterator<'a>(&'a mut ViewTree);
-        impl<'a> Iterator for PatchIterator<'a> {
+        struct PatchIterator<'a, T>(&'a mut ViewTree<T>);
+        impl<'a, T> Iterator for PatchIterator<'a, T> {
             type Item = Patch;
             fn next(&mut self) -> Option<Patch> {
                 self.0.patches.pop_front()
@@ -62,13 +66,13 @@ impl ViewTree {
     }
 
     /// Renders a root view.
-    pub fn render_root(&mut self, view: Arc<dyn View>) {
+    pub fn render_root(&mut self, view: Arc<dyn View<Ctx>>, context: Ctx) {
         if let Some(root) = self.root {
-            self.diff(root, &view, 0);
+            self.diff(root, &view, 0, context);
         } else {
             let root_id = ViewId::new();
             self.root = Some(root_id);
-            self.diff(root_id, &view, 0);
+            self.diff(root_id, &view, 0, context);
         }
     }
 
@@ -79,7 +83,13 @@ impl ViewTree {
     /// - `nv_subregion_start`: the start index for the NV subregion for this view
     ///
     /// Returns native view IDs that belong to this view.
-    fn diff(&mut self, id: ViewId, view: &Arc<dyn View>, nv_subregion_start: usize) -> Vec<ViewId> {
+    fn diff(
+        &mut self,
+        id: ViewId,
+        view: &Arc<dyn View<Ctx>>,
+        nv_subregion_start: usize,
+        context: Ctx,
+    ) -> Vec<ViewId> {
         if let Some(node) = self.nodes.get(&id) {
             let mut is_same_type = node.view.as_any().type_id() == view.as_any().type_id();
             if is_same_type {
@@ -96,11 +106,11 @@ impl ViewTree {
 
             if !is_same_type {
                 // different type; needs to be replaced
-                self.replace_view(id, view, nv_subregion_start);
+                self.replace_view(id, view, nv_subregion_start, context);
             }
         } else {
             // does not exist; needs to be added
-            self.add_view(id, view, nv_subregion_start);
+            self.add_view(id, view, nv_subregion_start, context);
         }
 
         // render the node’s body
@@ -127,7 +137,13 @@ impl ViewTree {
     }
 
     /// Adds a new view to the tree.
-    fn add_view(&mut self, id: ViewId, view: &Arc<dyn View>, nv_subregion_start: usize) {
+    fn add_view(
+        &mut self,
+        id: ViewId,
+        view: &Arc<dyn View<Ctx>>,
+        nv_subregion_start: usize,
+        context: Ctx,
+    ) {
         let is_native = view.native_type().is_some();
         let state = view.new_state();
 
@@ -148,6 +164,7 @@ impl ViewTree {
                 },
                 state,
                 subviews: Vec::new(),
+                context,
             },
         );
     }
@@ -168,7 +185,13 @@ impl ViewTree {
     /// Replaces a view with another of a different type.
     ///
     /// The view must exist.
-    fn replace_view(&mut self, id: ViewId, view: &Arc<dyn View>, nv_subregion_start: usize) {
+    fn replace_view(
+        &mut self,
+        id: ViewId,
+        view: &Arc<dyn View<Ctx>>,
+        nv_subregion_start: usize,
+        context: Ctx,
+    ) {
         let current = self.nodes.get(&id).expect("replacing nonexistent view");
         let superview = current.superview;
         let nv_ancestor = current.nv_ancestor;
@@ -176,7 +199,7 @@ impl ViewTree {
         let is_native = view.native_type().is_some();
 
         self.remove_view(id, false);
-        self.add_view(id, view, nv_subregion_start);
+        self.add_view(id, view, nv_subregion_start, context);
 
         let node = self.nodes.get_mut(&id).unwrap();
         node.is_native = is_native;
@@ -194,7 +217,7 @@ impl ViewTree {
     }
 
     /// Updates an existing view with new properties, which must be of the same type.
-    fn update_view(&mut self, id: ViewId, view: &Arc<dyn View>) {
+    fn update_view(&mut self, id: ViewId, view: &Arc<dyn View<Ctx>>) {
         let node = self.nodes.get_mut(&id).expect("updating nonexistent view");
         debug_assert!(
             node.view.as_any().type_id() == view.as_any().type_id(),
@@ -211,7 +234,7 @@ impl ViewTree {
     fn diff_subviews(
         &mut self,
         superview: ViewId,
-        subview: Arc<dyn View>,
+        subview: Arc<dyn View<Ctx>>,
         nv_subregion_start: usize,
     ) -> Vec<ViewId> {
         let superview_node = &self.nodes[&superview];
@@ -223,9 +246,18 @@ impl ViewTree {
             // or the superview’s native ancestor
             superview_node.nv_ancestor
         };
+        let nv_subregion = superview_node.nv_subregion;
+
+        let subview_context = match superview_node
+            .view
+            .subview_context(&superview_node.state, &superview_node.context)
+        {
+            Some(ctx) => ctx,
+            None => superview_node.context.clone(),
+        };
 
         let mut single_subview_storage = Vec::with_capacity(1);
-        let subviews = match subview.as_any().downcast_ref::<Fragment>() {
+        let subviews = match subview.as_any().downcast_ref::<Fragment<Ctx>>() {
             Some(subviews) => subviews, // list of subviews
             None => match subview.as_any().downcast_ref::<()>() {
                 Some(()) => &single_subview_storage, // no subviews at all
@@ -280,7 +312,12 @@ impl ViewTree {
 
             if let Some(subview_id) = current_subviews_by_id.remove(&key) {
                 // this new subview already has a corresponding old subview
-                let mut nvs = self.diff(subview_id, &view, nv_subregion_cursor);
+                let mut nvs = self.diff(
+                    subview_id,
+                    &view,
+                    nv_subregion_cursor,
+                    subview_context.clone(),
+                );
                 nv_subregion_cursor += nvs.len();
                 nv_subviews.append(&mut nvs);
                 new_subviews.push(subview_id);
@@ -288,7 +325,12 @@ impl ViewTree {
                 // no existing view with the same key, needs to be created
                 let subview_id = ViewId::new();
 
-                let mut nvs = self.diff(subview_id, &view, nv_subregion_cursor);
+                let mut nvs = self.diff(
+                    subview_id,
+                    &view,
+                    nv_subregion_cursor,
+                    subview_context.clone(),
+                );
                 nv_subregion_cursor += nvs.len();
                 nv_subviews.append(&mut nvs);
 
@@ -304,9 +346,19 @@ impl ViewTree {
             self.remove_view(id, true);
         }
 
-        self.nodes.get_mut(&superview).unwrap().subviews = new_subviews;
-        self.patches
-            .push_back(Patch::Subviews(superview, nv_subviews.clone()));
+        if let Some(nv_ancestor) = nv_ancestor {
+            self.patches.push_back(Patch::SubviewRegion(
+                nv_ancestor,
+                nv_subregion.pos,
+                nv_subregion.len,
+                nv_subviews.clone(),
+            ));
+        }
+
+        let superview_node = self.nodes.get_mut(&superview).unwrap();
+        superview_node.subviews = new_subviews;
+        superview_node.nv_subregion.pos = nv_subregion_start;
+        superview_node.nv_subregion.len = nv_subviews.len();
         nv_subviews
     }
 }

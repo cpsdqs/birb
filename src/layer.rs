@@ -10,7 +10,7 @@ use core::{fmt, mem};
 use swift_birb::protocol::SBLayerPatch;
 
 /// A native view that contains graphical content and may have subviews.
-pub struct Layer {
+pub struct Layer<Ctx> {
     pub key: Option<u64>,
 
     /// Layer bounds.
@@ -35,7 +35,7 @@ pub struct Layer {
     pub opacity: f64,
 
     /// Subviews of this layer.
-    pub subviews: Fragment,
+    pub subviews: Fragment<Ctx>,
 
     /// Layout handler for this layer.
     pub layout: Box<dyn Layout>,
@@ -58,7 +58,7 @@ impl<'a, T> fmt::Debug for DebugifyOption<'a, T> {
     }
 }
 
-impl fmt::Debug for Layer {
+impl<Ctx> fmt::Debug for Layer<Ctx> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         f.debug_struct("Layer")
             .field("bounds", &self.bounds)
@@ -79,7 +79,7 @@ impl fmt::Debug for Layer {
 
 // TODO: builder methods
 
-impl Default for Layer {
+impl<Ctx> Default for Layer<Ctx> {
     fn default() -> Self {
         Layer {
             key: None,
@@ -100,8 +100,8 @@ impl Default for Layer {
     }
 }
 
-impl PartialEq for Layer {
-    fn eq(&self, other: &Layer) -> bool {
+impl<Ctx: 'static> PartialEq for Layer<Ctx> {
+    fn eq(&self, other: &Layer<Ctx>) -> bool {
         self.bounds == other.bounds
             && self.background == other.background
             && self.corner_radius == other.corner_radius
@@ -115,7 +115,7 @@ impl PartialEq for Layer {
 }
 
 impl_view! {
-    Layer;
+    Layer<Ctx>;
     fn new_state(&self) {
         Box::new(())
     }
@@ -130,7 +130,7 @@ impl_view! {
     }
 }
 
-impl Layer {
+impl<Ctx> Layer<Ctx> {
     pub(crate) fn as_patch(&self) -> SBLayerPatch {
         SBLayerPatch {
             bounds: self.bounds.into(),
