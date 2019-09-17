@@ -6,9 +6,6 @@ use core::fmt;
 use std::sync::Arc;
 use uuid::Uuid;
 
-#[cfg(target_os = "macos")]
-use swift_birb::protocol::SBViewId;
-
 /// A unique identifier for a view.
 ///
 /// (this is just a UUID)
@@ -21,17 +18,6 @@ impl ViewId {
         let uuid = Uuid::new_v4();
         let (a, b, c, d) = uuid.as_fields();
         ViewId(a, b, c, *d)
-    }
-}
-
-impl Into<SBViewId> for ViewId {
-    fn into(self) -> SBViewId {
-        SBViewId {
-            a: self.0,
-            b: self.1,
-            c: self.2,
-            d: self.3,
-        }
     }
 }
 

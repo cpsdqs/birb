@@ -4,10 +4,7 @@ use crate::impl_view;
 use crate::rect::Rect;
 use crate::view::{Fragment, Layout, NativeType, View};
 use cgmath::{Matrix3, SquareMatrix};
-use core::{fmt, mem};
-
-#[cfg(target_os = "macos")]
-use swift_birb::protocol::SBLayerPatch;
+use core::fmt;
 
 /// A native view that contains graphical content and may have subviews.
 pub struct Layer<Ctx> {
@@ -124,20 +121,5 @@ impl_view! {
     }
     fn key(&self) -> Option<u64> {
         self.key
-    }
-}
-
-impl<Ctx> Layer<Ctx> {
-    pub(crate) fn as_patch(&self) -> SBLayerPatch {
-        SBLayerPatch {
-            bounds: self.bounds.into(),
-            background: self.background.into(),
-            corner_radius: self.corner_radius,
-            border_width: self.border.map_or(0., |(w, _)| w),
-            border_color: self.border.map_or(Color::default(), |(_, c)| c).into(),
-            clip_contents: self.clip_contents,
-            transform: unsafe { mem::transmute(self.transform) }, // totally safe, trust me
-            opacity: self.opacity,
-        }
     }
 }

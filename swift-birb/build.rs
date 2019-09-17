@@ -66,7 +66,7 @@ fn build_cocoa() {
 
     // also generate bindings from the header
     let bindings = bindgen::Builder::default()
-        .header("../birb-core.h")
+        .header("./birb-core.h")
         .whitelist_type("SBEvent")
         .whitelist_type("SBPatch")
         .whitelist_type("SBEventDispatcher")

@@ -2,6 +2,7 @@ use crate::rect::Rect;
 use crate::view::{LayoutResult, ViewId};
 use std::collections::HashMap;
 
+/// TODO: native view serialization
 #[derive(Clone)]
 pub enum NativeView {
     Layer,
@@ -14,8 +15,6 @@ pub enum Patch {
     Update(ViewId, NativeView),
     /// Deletes and re-creates a view.
     Replace(ViewId, NativeView),
-    /// Sets a view’s subviews.
-    Subviews(ViewId, Vec<ViewId>),
     /// Replaces a region of a view’s subviews.
     ///
     /// `(superview, region, subviews)`
@@ -57,7 +56,6 @@ impl NVTree {
         match patch {
             Patch::Update(id, view) => self.update_view(id, view),
             Patch::Replace(id, view) => self.replace_view(id, view),
-            Patch::Subviews(id, subviews) => self.set_subviews(id, subviews),
             Patch::SubviewRegion(id, a, b, subviews) => self.subview_region(id, a, b, subviews),
             Patch::Remove(id) => self.remove_view(id),
         }
@@ -96,23 +94,6 @@ impl NVTree {
         } else {
             Err(PatchError::NoSuchView(id))
         }
-    }
-
-    fn set_subviews(&mut self, id: ViewId, subviews: Vec<ViewId>) -> Result<(), PatchError> {
-        for subview in &subviews {
-            let node = match self.nodes.get_mut(subview) {
-                Some(node) => node,
-                None => return Err(PatchError::NoSuchView(*subview)),
-            };
-            node.superview = Some(id);
-        }
-
-        let node = match self.nodes.get_mut(&id) {
-            Some(node) => node,
-            None => return Err(PatchError::NoSuchView(id)),
-        };
-        node.subviews = subviews;
-        Ok(())
     }
 
     fn subview_region(

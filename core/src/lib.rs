@@ -75,16 +75,18 @@
 //! - Surfaces
 //! - at least one type of pointer events
 
+pub mod backend;
 pub mod color;
 pub mod events;
-// mod host;
 mod layer;
 mod nv_tree;
+pub mod raw_events;
 mod rect;
 #[macro_use]
 mod view;
 mod view_tree;
 
 pub use nv_tree::{NVTree, NativeView, Patch};
+pub use rect::Rect;
 pub use view::{State, View};
 pub use view_tree::{Context, ViewTree};

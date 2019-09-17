@@ -5,8 +5,12 @@ use core::fmt;
 use parking_lot::Mutex;
 use std::sync::Arc;
 
+/// An event.
 pub struct Event<Type> {
     data: Type,
+
+    // TODO: phase/capture/priority stuff
+    // TODO: some way to access data
 }
 
 /// List of event types.
@@ -19,12 +23,7 @@ pub enum EventTypeId {
     Scroll = 3,
 }
 
-impl EventTypeId {
-    // smallest and largest values in Ord
-    pub(crate) const MIN: Self = EventTypeId::Hover;
-    pub(crate) const MAX: Self = EventTypeId::Scroll;
-}
-
+/// Internal trait for individual event types.
 pub trait EventType: fmt::Debug + From<Event<Self>> {
     fn location(&self) -> Option<Point2<f64>>;
     fn type_id() -> EventTypeId;
@@ -187,8 +186,11 @@ impl From<Event<Key>> for Key {
 }
 
 /// Modifier key state.
+///
+/// This should not be emulated using keyboard events because cases like cross-application
+/// drag-and-drop would not cause key events to be fired beforehand.
 #[repr(C)]
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct KeyModifiers {
     /// Whether any shift key is pressed.
     shift: bool,
@@ -235,6 +237,7 @@ impl From<Event<Scroll>> for Scroll {
     }
 }
 
+/// An event handler.
 pub struct EventHandler<Type>(Arc<Mutex<dyn FnMut(Event<Type>) + Send>>);
 
 impl<T> Clone for EventHandler<T> {
