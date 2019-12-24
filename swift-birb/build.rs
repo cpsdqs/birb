@@ -30,12 +30,17 @@ fn build_cocoa() {
         .args(&xcode_args)
         .arg("-derivedDataPath")
         .arg(format!("{}/build", out_dir))
+        .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .output()
         .unwrap();
-    let stderr = String::from_utf8_lossy(&output.stderr);
-    eprintln!("{}", stderr);
-    assert!(output.status.success(), "xcodebuild failed");
+    if !output.status.success() {
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        eprintln!("{}", stdout);
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        eprintln!("{}", stderr);
+        panic!("xcodebuild failed");
+    }
 
     println!("cargo:rerun-if-changed={}/SwiftBirb", proj_path);
     for entry in
@@ -66,14 +71,13 @@ fn build_cocoa() {
 
     // also generate bindings from the header
     let bindings = bindgen::Builder::default()
-        .header("./birb-core.h")
-        .whitelist_type("SBEvent")
+        .header("./protocol.h")
         .whitelist_type("SBPatch")
-        .whitelist_type("SBEventDispatcher")
-        // unstable: .default_enum_style(bindgen::EnumVariation::Rust { non_exhaustive: true, })
+        .whitelist_type("SBNodeList")
+        // .default_enum_style(bindgen::EnumVariation::Rust { non_exhaustive: true, })
         .prepend_enum_name(false)
         .generate()
-        .expect("Failed to generate birb core bindings");
+        .expect("Failed to generate protocol bindings");
 
     let out_path = PathBuf::from(env::var("OUT_DIR").unwrap());
     bindings

@@ -1,4 +1,4 @@
-use crate::nv_tree::{NativeView, Patch};
+use crate::nv_tree::Patch;
 use crate::view::{Fragment, State, View, ViewId};
 use std::collections::HashMap;
 use std::collections::VecDeque;
@@ -18,9 +18,11 @@ struct TreeNode<Ctx> {
     is_native: bool,
     /// The immediate superview.
     superview: Option<ViewId>,
-    /// The closest native ancestor view.
+    /// The closest ancestor that is a native view.
     nv_ancestor: Option<ViewId>,
     /// Subregion in the native ancestor’s subviews.
+    /// This is because one composite view may have multiple native subviews, so we need to know
+    /// how many of them and where they are in the native view tree.
     nv_subregion: Subregion,
     /// The view state.
     state: Box<dyn State<Ctx>>,
@@ -46,19 +48,20 @@ pub struct Context<Ctx> {
 
 impl<Ctx> Context<Ctx> {
     pub fn request_render(&self) {
-        unimplemented!()
+        todo!()
     }
 
     pub fn request_layout(&self) {
-        unimplemented!()
+        todo!()
     }
 
     pub fn request_context(&self) {
-        unimplemented!()
+        // FIXME: what is this??
+        todo!()
     }
 
     pub fn ctx(&self) -> &Ctx {
-        unimplemented!()
+        &self.context
     }
 }
 
@@ -98,6 +101,7 @@ where
             let root_id = ViewId::new();
             self.root = Some(root_id);
             self.diff(root_id, &view, 0, context);
+            self.patches.push_back(Patch::SetRoot(root_id));
         }
     }
 
@@ -107,7 +111,7 @@ where
     /// - `view`: the new view
     /// - `nv_subregion_start`: the start index for the NV subregion for this view
     ///
-    /// Returns native view IDs that belong to this view.
+    /// Returns native view IDs that are descendants of this view.
     fn diff(
         &mut self,
         id: ViewId,
@@ -176,7 +180,8 @@ where
         });
 
         if is_native {
-            self.patches.push_back(Patch::Update(id, NativeView::Layer));
+            self.patches
+                .push_back(Patch::Update(id, view.native_view()));
         }
 
         self.nodes.insert(
@@ -236,11 +241,12 @@ where
 
         if was_native && is_native {
             self.patches
-                .push_back(Patch::Replace(id, NativeView::Layer));
+                .push_back(Patch::Replace(id, view.native_view()));
         } else if was_native {
             self.patches.push_back(Patch::Remove(id));
         } else if is_native {
-            self.patches.push_back(Patch::Update(id, NativeView::Layer));
+            self.patches
+                .push_back(Patch::Update(id, view.native_view()));
         }
     }
 
@@ -253,7 +259,8 @@ where
         );
         node.state.will_update(&**view);
         if node.is_native {
-            self.patches.push_back(Patch::Update(id, NativeView::Layer));
+            self.patches
+                .push_back(Patch::Update(id, view.native_view()));
         }
         node.view = Arc::clone(view);
     }

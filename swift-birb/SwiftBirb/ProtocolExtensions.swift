@@ -38,3 +38,18 @@ extension SBMatrix3 {
         }
     }
 }
+
+extension SBNodeList {
+    /// Converts this into a Swift list and deallocates the memory.
+    ///
+    /// Safety: once this function has been called, the SBNodeList must not be used, because it would access deallocated memory.
+    func intoList() -> [SBNode] {
+        var list: [SBNode] = []
+        for i in 0...count {
+            let node = nodes.assumingMemoryBound(to: SBNode.self).advanced(by: Int(i)).pointee
+            list.append(node)
+        }
+        nodes.deallocate()
+        return list
+    }
+}

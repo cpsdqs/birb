@@ -8,7 +8,6 @@ use std::sync::Arc;
 /// An event.
 pub struct Event<Type> {
     data: Type,
-
     // TODO: phase/capture/priority stuff
     // TODO: some way to access data
 }

@@ -49,10 +49,6 @@ class SBLayer : NSView, SBRenderable {
 
     // MARK: SBRenderable
 
-    func id() -> ViewId {
-        node.id
-    }
-
     func update(_ patch: SBNodePatch) {
         assert(patch.type == SBNodeTypeLayer, "incorrect patch type")
         let data = patch.patch.layer
@@ -84,7 +80,7 @@ class SBLayer : NSView, SBRenderable {
         if let index = subviews.firstIndex(where: { $0 == subviewView }) {
             subviews.remove(at: index)
         } else {
-            NSLog("Warning: found no subview here with ID \(subview.id)")
+            NSLog("Warning: could not find this subview here: \(subview)")
         }
     }
 

@@ -14,4 +14,4 @@ FOUNDATION_EXPORT double SwiftBirbVersionNumber;
 //! Project version string for SwiftBirb.
 FOUNDATION_EXPORT const unsigned char SwiftBirbVersionString[];
 
-id SBGetHostClass(void);
+id SBHostingView_getClass(void);

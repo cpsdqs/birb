@@ -444,4 +444,10 @@ typedef struct {
     SBPatchData data;
 } SBPatch;
 
+/** A list of nodes. Ownership of the pointers is guaranteed (not the pointees though) */
+typedef struct {
+    void* nodes;
+    uint64_t count;
+} SBNodeList;
+
 #endif // BIRB_H

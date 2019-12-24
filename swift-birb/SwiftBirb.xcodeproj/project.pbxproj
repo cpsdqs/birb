@@ -8,14 +8,14 @@
 
 /* Begin PBXBuildFile section */
 		0F366199230332C20095F337 /* SBLayer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0F366198230332C20095F337 /* SBLayer.swift */; };
-		0F40DA3C2302FB230000B43A /* birb-core.h in Headers */ = {isa = PBXBuildFile; fileRef = 0FA62D662302D82600386FF4 /* birb-core.h */; };
+		0F40DA3C2302FB230000B43A /* protocol.h in Headers */ = {isa = PBXBuildFile; fileRef = 0FA62D662302D82600386FF4 /* protocol.h */; };
 		0F40DA45230311A70000B43A /* SwiftBirb.h in Headers */ = {isa = PBXBuildFile; fileRef = 0FA62D4F2302D75E00386FF4 /* SwiftBirb.h */; };
 		0F40DA47230312530000B43A /* SwiftBirb.m in Sources */ = {isa = PBXBuildFile; fileRef = 0F40DA46230312530000B43A /* SwiftBirb.m */; };
 		0F7A51D72306F61A00BA9DFC /* WacomMultiTouch.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 0F7A51D62306F61A00BA9DFC /* WacomMultiTouch.framework */; settings = {ATTRIBUTES = (Weak, ); }; };
 		0F8329A12302FADA00F14BD5 /* SBNode.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0FF4CF4D2302DC470018B582 /* SBNode.swift */; };
 		0F8329A22302FADC00F14BD5 /* ViewId.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0FF4CF5A2302E8830018B582 /* ViewId.swift */; };
 		0FACB58223074ABE00BD63E2 /* SBHostingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0FA62D682302D98400386FF4 /* SBHostingView.swift */; };
-		0FBA2C6D2304271C0037EEA0 /* CoreExtensions.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0FBA2C6C2304271C0037EEA0 /* CoreExtensions.swift */; };
+		0FBA2C6D2304271C0037EEA0 /* ProtocolExtensions.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0FBA2C6C2304271C0037EEA0 /* ProtocolExtensions.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -26,9 +26,9 @@
 		0F40DA4A230317CD0000B43A /* Info.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		0F7A51D62306F61A00BA9DFC /* WacomMultiTouch.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = WacomMultiTouch.framework; path = /Library/Frameworks/WacomMultiTouch.framework; sourceTree = "<absolute>"; };
 		0FA62D4F2302D75E00386FF4 /* SwiftBirb.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = SwiftBirb.h; sourceTree = "<group>"; };
-		0FA62D662302D82600386FF4 /* birb-core.h */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.h; fileEncoding = 4; name = "birb-core.h"; path = "../birb-core.h"; sourceTree = "<group>"; };
+		0FA62D662302D82600386FF4 /* protocol.h */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.h; fileEncoding = 4; name = protocol.h; path = ../protocol.h; sourceTree = "<group>"; };
 		0FA62D682302D98400386FF4 /* SBHostingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SBHostingView.swift; sourceTree = "<group>"; };
-		0FBA2C6C2304271C0037EEA0 /* CoreExtensions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CoreExtensions.swift; sourceTree = "<group>"; };
+		0FBA2C6C2304271C0037EEA0 /* ProtocolExtensions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProtocolExtensions.swift; sourceTree = "<group>"; };
 		0FF4CF4D2302DC470018B582 /* SBNode.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SBNode.swift; sourceTree = "<group>"; };
 		0FF4CF5A2302E8830018B582 /* ViewId.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ViewId.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -66,8 +66,8 @@
 			isa = PBXGroup;
 			children = (
 				0F40DA4A230317CD0000B43A /* Info.plist */,
-				0FA62D662302D82600386FF4 /* birb-core.h */,
-				0FBA2C6C2304271C0037EEA0 /* CoreExtensions.swift */,
+				0FA62D662302D82600386FF4 /* protocol.h */,
+				0FBA2C6C2304271C0037EEA0 /* ProtocolExtensions.swift */,
 				0F40DA3E2302FBC10000B43A /* Bridging-Header.h */,
 				0FA62D4F2302D75E00386FF4 /* SwiftBirb.h */,
 				0F40DA46230312530000B43A /* SwiftBirb.m */,
@@ -94,7 +94,7 @@
 			isa = PBXHeadersBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				0F40DA3C2302FB230000B43A /* birb-core.h in Headers */,
+				0F40DA3C2302FB230000B43A /* protocol.h in Headers */,
 				0F40DA45230311A70000B43A /* SwiftBirb.h in Headers */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -163,7 +163,7 @@
 				0F366199230332C20095F337 /* SBLayer.swift in Sources */,
 				0F8329A22302FADC00F14BD5 /* ViewId.swift in Sources */,
 				0FACB58223074ABE00BD63E2 /* SBHostingView.swift in Sources */,
-				0FBA2C6D2304271C0037EEA0 /* CoreExtensions.swift in Sources */,
+				0FBA2C6D2304271C0037EEA0 /* ProtocolExtensions.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

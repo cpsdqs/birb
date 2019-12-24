@@ -1,3 +1,4 @@
+use crate::nv_tree::NativeView;
 use crate::rect::Rect;
 use crate::view_tree::Context;
 use cgmath::{Vector2, Zero};
@@ -161,17 +162,23 @@ pub trait View<Ctx>: Any + fmt::Debug + Send + Sync {
     }
 
     /// Returns the native type if this is a native view.
-    ///
-    /// Should always be None for types outside of this crate.
-    #[doc(hidden)]
     fn native_type(&self) -> Option<NativeType> {
         None
     }
 
+    /// If native_type is not None, this should return a native view.
+    fn native_view(&self) -> NativeView {
+        panic!(
+            "unimplemented native_view on a view with native_type {:?}",
+            self.native_type()
+        )
+    }
+
     /// For proxy views; should not be overridden usually.
     ///
-    /// Will be called if the views have the same TypeId, so the default implementation that always
-    /// returns true should be fine for almost all views.
+    /// Will be called iff the views have the same TypeId, so the default implementation that always
+    /// returns true should be fine for almost all views. This is useful when the proxied views
+    /// are not actually the same type and hence should cause a new tree to be created.
     fn is_same_type(&self, other: &dyn View<Ctx>) -> bool {
         drop(other);
         true
@@ -279,14 +286,14 @@ pub struct SubviewLayout<'a> {
 impl<'a> SubviewLayout<'a> {
     /// Performs layout if it hasn’t been run already.
     pub fn force_layout(&mut self) {
-        unimplemented!()
+        todo!()
     }
 
     /// The subview’s minimum size.
     /// May be zero if it hasn’t been computed yet (e.g. on first render).
     /// If it’s important, use `force_layout` to try and get it a frame earlier.
     pub fn min_size(&self) -> Vector2<f64> {
-        unimplemented!()
+        todo!()
     }
 }
 

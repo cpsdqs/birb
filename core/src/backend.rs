@@ -14,8 +14,24 @@ pub trait Backend {
     /// Creates a new view.
     fn new_view(&mut self, view: NativeView) -> Result<Self::ViewRef, Self::Error>;
 
-    /// Updates the view.
-    fn update(&mut self, view: &mut Self::ViewRef, view: NativeView) -> Result<(), Self::Error>;
+    /// Removes a view from the view hierarchy.
+    fn remove_view(&mut self, view: Self::ViewRef) -> Result<(), Self::Error>;
+
+    /// Updates a view.
+    fn update_view(
+        &mut self,
+        view: &mut Self::ViewRef,
+        view: NativeView,
+    ) -> Result<(), Self::Error>;
+
+    /// Replaces a view in the view hierarchy with another.
+    ///
+    /// Similar to update, but the view types will be different.
+    fn replace_view(
+        &mut self,
+        view: &mut Self::ViewRef,
+        view: NativeView,
+    ) -> Result<(), Self::Error>;
 
     /// Sets a region of the view’s subviews.
     fn set_subviews<'a>(
@@ -26,8 +42,11 @@ pub trait Backend {
         subviews: Vec<&'a Self::ViewRef>,
     ) -> Result<(), Self::Error>;
 
+    /// Sets the root view.
+    fn set_root_view(&mut self, view: &mut Self::ViewRef) -> Result<(), Self::Error>;
+
     /// Returns the next event from the queue.
     ///
     /// This method may be called frequently in quick succession.
-    fn poll() -> Result<Option<RawEvent>, Self::Error>;
+    fn poll(&mut self) -> Result<Option<RawEvent>, Self::Error>;
 }

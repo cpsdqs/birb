@@ -9,6 +9,6 @@
 #ifndef Bridging_Header_h
 #define Bridging_Header_h
 
-#import "birb-core.h"
+#import "protocol.h"
 
 #endif /* Bridging_Header_h */

@@ -9,63 +9,47 @@
 import Cocoa
 
 /// A single birb tree node.
-class SBNode {
-    let id: ViewId
+@objc public class SBNode : NSObject {
     unowned let host: SBHostingView
     var type: SBNodeType
-    var firstRender = true
-    var view: SBRenderable!
+    var view: SBRenderable
     var parent: SBNode?
-    var subviews: Set<ViewId> = Set()
+    var subviews: [SBNode] = []
 
-    init(host: SBHostingView, id: ViewId, patch: SBNodePatch) {
+    init(host: SBHostingView, patch: SBNodePatch) {
         self.host = host
-        self.id = id
         type = patch.type
-        update(patch)
+        view = PropertySelfDotViewNotInitializedAtSuperDotInitCallSigh()
+        super.init()
+        view = makeView(patch: patch)
     }
 
     /// Updates this node with a patch.
-    func update(_ patch: SBNodePatch) {
-        if patch.type != type || firstRender {
-            if firstRender {
-                firstRender = false
-            } else {
-                // TODO: view.destroy() or something
-            }
-
-            type = patch.type
-            view = makeView(patch: patch)
-        }
+    @objc public func update(patch: SBNodePatch) {
+        view.update(patch)
     }
 
-    func addSubview(_ node: SBNode) {
-        node.parent = self
-        subviews.insert(node.id)
-        view.addSubview(node)
+    @objc public func replace(patch: SBNodePatch) {
+        type = patch.type
+        view = makeView(patch: patch)
     }
 
-    func removeSubview(_ node: SBNode) {
-        node.parent = nil
-        subviews.remove(node.id)
-        view.removeSubview(node)
+    @objc public func setSubviews(offset: UInt64, length: UInt64, subviews: SBNodeList) {
+        let subviews = subviews.intoList()
+        let a = Int(offset)
+        let b = Int(length)
+
+        self.subviews[a...(a + b)] = subviews[...]
+
+        // TODO: need to call addSubview/removeSubview on SBRenderable?
     }
 
     /// Removes this node.
-    func remove() {
-        if let parent = self.parent {
-            parent.removeSubview(self)
-        }
+    @objc func remove() {
         view.removeSelf()
     }
 
-    func emitEvent(_ type: SBEventTypeId, _ timestamp: Double, _ data: SBEventData) {
-        let handler = SBHandlerId(view: id.asRaw(), type: type);
-
-        let event = SBEvent(type: type, handler: handler, timestamp: timestamp, data: data);
-        host.dispatch(event: event);
-    }
-
+    /// Creates the actual renderable given a patch. Used when creating/replacing.
     private func makeView(patch: SBNodePatch) -> SBRenderable {
         switch (patch.type) {
         case SBNodeTypeLayer:
@@ -77,10 +61,26 @@ class SBNode {
 }
 
 protocol SBRenderable {
-    init(node: SBNode, patch: SBNodePatch);
-    func id() -> ViewId;
-    func update(_ patch: SBNodePatch);
-    func addSubview(_ subview: SBNode);
-    func removeSubview(_ subview: SBNode);
-    func removeSelf();
+    init(node: SBNode, patch: SBNodePatch)
+    var node: SBNode { get }
+    func update(_ patch: SBNodePatch)
+    func addSubview(_ subview: SBNode)
+    func removeSubview(_ subview: SBNode)
+    func removeSelf()
+}
+
+/// sigh
+/// why yes indeed SBNode.view could be an unconditional unwrapping type, but the only place we’d actually need this is during init and hence would be kind of a dumb thing to have
+struct PropertySelfDotViewNotInitializedAtSuperDotInitCallSigh : SBRenderable {
+    init() {}
+    init(node: SBNode, patch: SBNodePatch) {}
+    var node: SBNode {
+        get {
+            fatalError()
+        }
+    }
+    func update(_ patch: SBNodePatch) {}
+    func addSubview(_ subview: SBNode) {}
+    func removeSubview(_ subview: SBNode) {}
+    func removeSelf() {}
 }
